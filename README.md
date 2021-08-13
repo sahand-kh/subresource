@@ -24,6 +24,11 @@ Suppose you have house, room and furniture models . One solution would be to def
     }
 SubResource takes the above request and define house, rooms and furnitures automatically.
 
+## Installation
+#### Install with Composer
+
+    composer require basilisk/subresource
+
 ## Getting started
 
 **Subresource** is very easy to use. All that is needed is to add a public property to the model called **subResourcesConfigs** , which takes an array of child relationships. Back to our example Imagine the house model is as follow:
