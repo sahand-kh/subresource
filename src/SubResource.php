@@ -4,11 +4,12 @@
 namespace Basilisk\SubResource;
 
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\CssSelector\Exception\InternalErrorException;
 
 class SubResource
 {
@@ -51,13 +52,15 @@ class SubResource
         $model =  new $resourceModelName;
         $currentResource = $model::create($requestData);
         foreach ($model->subResourcesConfigs ?? [] as $relationName => $subResourcesConfig):
-
             $relationName = $this->processSubResourceConfigs($relationName, $subResourcesConfig);
+            $relationType = $model->{$relationName}()->getProcessor();
             $this->newlyCreatedSubResourceInstances = [];
             $subResourceModel = $model->{$relationName}()->getModel();
             $subResourceValues = $requestData[$relationName] ?? [];
             foreach($subResourceValues as $subResourceValue):
                 $this->newlyCreatedSubResourceInstances[] = (new SubResource())->storeSubResources($subResourceValue, $subResourceModel);
+                if ($relationType instanceof HasOne || $relationType instanceof BelongsTo)
+                    break;
             endforeach;
 
             $currentResource->{$relationName}()->saveMany($this->newlyCreatedSubResourceInstances);
@@ -77,12 +80,14 @@ class SubResource
         );
 
         foreach ($model->subResourcesConfigs ?? [] as $relationName => $subResourcesConfig):
-            $relationName = $this->processSubResourceConfigs($relationName, $subResourcesConfig);
-
             $this->newlyCreatedSubResourceInstances = [];
+            $relationName = $this->processSubResourceConfigs($relationName, $subResourcesConfig);
+            $relationType = $model->{$relationName}()->getProcessor();
             $subResourceModel = $model->{$relationName}()->getModel();
             $relatedSubResourceIds = $currentResource->{$relationName}->pluck('id')->all();
             $subResourceNewValues = $requestData[$relationName] ?? [];
+            if (!empty($subResourceNewValues) && ($relationType instanceof HasOne || $relationType instanceof BelongsTo))
+                $subResourceNewValues[] = $subResourceNewValues; //sdgsdgsdgsdgsdgsdg
             foreach($subResourceNewValues as $subResourceValue)
                 if (isset($subResourceValue['id'])):
                     $subResourceToBeUpdated = $subResourceModel->findOrFail($subResourceValue['id']);
@@ -90,13 +95,13 @@ class SubResource
                         unset($relatedSubResourceIds[$key]);
                         (new SubResource())->updateSubResources($subResourceValue, $subResourceToBeUpdated, $subResourceModel);
                     else:
-                        $this->updateSubResourceParent($currentResource, $subResourceToBeUpdated, $subResourceModel);
+                        $this->updateSubResourceParent($relationName, $relationType, $currentResource, $subResourceModel);
                     endif;
                 else:
                     $this->newlyCreatedSubResourceInstances[] = (new SubResource())->updateSubResources($subResourceValue, null, $subResourceModel);
                 endif;
 
-            $this->removeSubResources($relatedSubResourceIds, $relationName, $currentResource, $subResourceModel);
+            $this->removeSubResources($relatedSubResourceIds, $relationName, $relationType, $currentResource, $subResourceModel);
 
             $currentResource->{$relationName}()->saveMany($this->newlyCreatedSubResourceInstances);
         endforeach;
@@ -129,14 +134,16 @@ class SubResource
      * @param $parentModel
      * @param $subResourceModel
      */
-    private function removeSubResources($relatedSubResourceIds, string $relationName, $parentModel, $subResourceModel): void
+    private function removeSubResources($relatedSubResourceIds, string $relationName, $relationType, $parentModel, $subResourceModel): void
     {
         if (!empty($relatedSubResourceIds)):
-            if ($parentModel->{$relationName}()->getProcessor() instanceof HasMany)
+            if ($relationType instanceof HasMany || $relationType instanceof HasOne)
                 $subResourceModel
                     ->whereIn('id', $relatedSubResourceIds)
                     ->update([$parentModel->{$relationName}()->getForeignKeyName() => null]);
-            elseif ($parentModel->{$relationName}()->getProcessor() instanceof BelongsToMany)
+            elseif ($relationType instanceof BelongsTo)
+                $parentModel->update([$parentModel->{$relationName}()->getForeignKeyName() => null]);
+            elseif ($relationType instanceof BelongsToMany)
                 $parentModel->{$relationName}()->detach($relatedSubResourceIds);
         endif;
 
@@ -146,14 +153,17 @@ class SubResource
 
     /**
      * @param string $relationName
-     * @param $currentResource
-     * @param $subResourceToBeUpdated
+     * @param $relationType
+     * @param $parentModel
+     * @param $subResourceModel
      */
-    private function updateSubResourceParent(string $relationName, $parentModel, $subResourceToBeUpdated): void
+    private function updateSubResourceParent(string $relationName, $relationType, $parentModel, $subResourceModel): void
     {
-        if ($parentModel->{$relationName}()->getProcessor() instanceof HasMany)
-            $subResourceToBeUpdated->update([$parentModel->{$relationName}()->getForeignKeyName() => $parentModel->id]);
-        elseif ($parentModel->{$relationName}()->getProcessor() instanceof BelongsToMany)
-            $parentModel->{$relationName}()->attach($subResourceToBeUpdated->id);
+        if ($relationType instanceof HasMany || $relationType instanceof HasOne)
+            $subResourceModel->update([$parentModel->{$relationName}()->getForeignKeyName() => $parentModel->id]);
+        elseif ($relationType instanceof BelongsTo)
+            $parentModel->update([$parentModel->{$relationName}()->getForeignKeyName() => $subResourceModel->id]);
+        elseif ($relationType instanceof BelongsToMany)
+            $parentModel->{$relationName}()->attach($subResourceModel->id);
     }
 }

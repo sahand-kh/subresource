@@ -57,6 +57,7 @@ To use SubResource you need to use SubResource Facade, which provides to method:
     SubResource::update(\Illuminate\Http\Request $request, 
     ParentModelObjectWeTriedToUpdate);
 
+**SubResource** use transactions, therefore it is highly suggested to use a database engine that supports transactions.
 ## Update
 To update a subresource you need to specify the resource id in the JSON request. For example imagine you want to update house with id "80" and also it rooms and each rooms furnitures, Thus you send a PUT/PATCH request to *"base_url/house/80"*, following is a sample request body:
   
