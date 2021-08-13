@@ -1,0 +1,30 @@
+{
+    "name": "basilisk/subresource",
+    "description": "allow to create and update a model and its related models in a single request",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "sahand khodaparast",
+            "email": "sahand.khodaparast@gmail.com"
+        }
+    ],
+    "require": {
+        "illuminate/support": "~6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Basilisk\\SubResource\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Basilisk\\SubResource\\SubResourceServiceProvider"
+            ],
+            "aliases": {
+                "SubResource": "Basilisk\\SubResource\\Facades\\SubResource"
+            }
+        }
+    }
+}
