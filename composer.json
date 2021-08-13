@@ -9,9 +9,6 @@
             "email": "sahand.khodaparast@gmail.com"
         }
     ],
-    "require": {
-        "illuminate/support": "~6"
-    },
     "autoload": {
         "psr-4": {
             "Basilisk\\SubResource\\": "src/"
